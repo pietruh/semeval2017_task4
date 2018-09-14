@@ -1,4 +1,5 @@
 from keras.layers import Embedding, Bidirectional, LSTM, Dropout, MaxoutDense, Dense, Activation, Flatten
+#from keras.layers import Dense, Input, GlobalMaxPooling1D
 
 from keras.models import Sequential
 from keras.regularizers import l2
@@ -7,6 +8,7 @@ from keras.optimizers import Adam
 
 def get_RNN(unit=LSTM, cells=64, bi=False, return_sequences=True, dropout_U=0.,
             consume_less='cpu', l2_reg=0):
+    """:param dropout_U: Fraction of the input units to drop for recurrent connections."""
     rnn = unit(cells, return_sequences=return_sequences,
                consume_less=consume_less, dropout_U=dropout_U,
                W_regularizer=l2(l2_reg))
@@ -92,23 +94,23 @@ def get_RNN_model_w_layer(embedding_layer, macro_averaging_recall, macro_average
     dropout_rnn = 0.3
     dropout_final = 0.5
     loss_l2 = 0.0001
-    clipnorm = 1.
+    clipnorm = 5.
     lr = 0.001
     # define embedding input layer
 
     model.add(embedding_layer)
+    model.add(Dropout(dropout_rnn))
 
-    rnn_layer_orig = get_RNN()
+    rnn_layer_orig = get_RNN(cells=300, bi=True, dropout_U=0.25)
     model.add(rnn_layer_orig)
 
     # define bidirectional LSTM layer no. 1
 
     # Add dropout for regularization after LSTM layer no. 1
-    model.add(Dropout(dropout_rnn))
+    model.add(Dropout(dropout_final))
 
     # define bidirectional LSTM layer no. 2
-    rnn_layer_orig_2 = get_RNN()
-
+    rnn_layer_orig_2 = get_RNN(cells=300, bi=True, dropout_U=0.25)
     model.add(rnn_layer_orig_2)
     # # define bidirectional LSTM layer no. 2
     # rnn_2 = Bidirectional(LSTM(64, return_sequences=return_sequences,
@@ -116,7 +118,7 @@ def get_RNN_model_w_layer(embedding_layer, macro_averaging_recall, macro_average
     #                            W_regularizer=l2(0.)))
     # model.add(rnn_2)
     # Add dropout for regularization after LSTM layer no. 2
-    model.add(Dropout(dropout_rnn))
+    model.add(Dropout(dropout_final))
 
     # model.add(MaxoutDense(100, input_dim=(None, 50), W_constraint=maxnorm(2)))
     #
