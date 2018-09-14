@@ -10,6 +10,14 @@ import keras.backend as K
 
 import pickle   # for tokenizer dumping
 
+
+def path_builder(path):
+    """ Build path if it does not exist"""
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return
+
+
 def list_txt_files_in_dir(directory):
     """List .txt files in the given directory"""
     import os
