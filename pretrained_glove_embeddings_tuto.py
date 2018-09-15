@@ -23,13 +23,15 @@ import keras.backend as K
 import keras
 
 from models import get_RNN_model_w_layer
-from nlp_utilities import path_builder, index_word_vectors, get_data, split_data, prepare_embedding_matrix, macro_averaged_recall_tf, \
+from nlp_utilities import path_builder, index_word_vectors, get_data, split_data, prepare_embedding_matrix, \
+    macro_averaged_recall_tf, \
     macro_averaged_recall_tf_soft
 
 # Import callbacks that will be passed to the fit functions
 from keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping, LearningRateScheduler
 
 from logger_to_file import Logger
+from data_generator import SynonymDataGenerator
 
 NAME_OF_THE_TRAIN_SESSION = "1_test_session"  # name of the training session to which all objects will be saved
 PATH_TO_THE_LEARNING_SESSION = "./learning_sessions/" + NAME_OF_THE_TRAIN_SESSION + "/"
@@ -45,12 +47,33 @@ if __name__ == "__main__":
     path_builder(PATH_TO_THE_LEARNING_SESSION)
     sys.stdout = Logger(PATH_TO_THE_LEARNING_SESSION + "log_training")
 
+    model_config = {"classes": 3,
+                    "max_length": 50,
+                    "masking": True,
+                    "return_sequences": True,
+                    "consume_less": 'cpu',
+                    "dropout_U": 0.3,
+                    "dropout_rnn": 0.3,
+                    "dropout_final": 0.5,
+                    "loss_l2": 0.0001,
+                    "clipnorm": 5.,
+                    "lr": 0.001,
+                    }
+
     config = {"GLOVE_DIR": 'glove.6B',
               "MAX_SEQUENCE_LENGTH": 50,
+              "OUTPUT_CLASSES": 3,
               "MAX_NUM_WORDS": 200000,
-              "MAX_INDEX_CNT": 1000010000,
+              "MAX_INDEX_CNT": 1000,  # 010000,
               "EMBEDDING_DIM": 100,
-              "VALIDATION_SPLIT": 0.2}
+              "VALIDATION_SPLIT": 0.2,
+              "SYNONIMIZE_FRACTION": 0.2,
+              "SYNONIMIZE_WORDS": 4,
+              "SYNONIMIZE_WORDS_FRACTION": 0.1,
+              "model_config": model_config,
+              "BATCH_SIZE": 128,
+              "EPOCHS": 3
+              }
 
     print('Indexing word vectors.')
     filename_to_read = os.path.join(config["GLOVE_DIR"], 'glove.6B.100d.txt')
@@ -109,15 +132,28 @@ if __name__ == "__main__":
     # Changing learning rate
     #lr_scheduler = LearningRateScheduler(schedule, verbose=0)
 
+    synonym_train_generator = SynonymDataGenerator(batch_size=config["BATCH_SIZE"], train_data_x=data,
+                                                   train_data_y=labels,
+                                                   embeddings_index=embeddings_index, word_index=word_index,
+                                                   config=config)
+
+
+    hitory_generator = model.fit_generator(generator=synonym_train_generator,
+                                           batch_size=config["BATCH_SIZE"],
+                                           epochs=config["EPOCHS"],
+                                           validation_data=(x_val, y_val),
+                                           callbacks=callbacks
+                                           )
+
     history = model.fit(x_train, y_train,
-                        batch_size=128,
-                        epochs=3,
+                        batch_size=config["BATCH_SIZE"],
+                        epochs=config["EPOCHS"],
                         validation_data=(x_val, y_val),
                         callbacks=callbacks)
 
     model.save("rnn_model_b128_ep3_1_maxindex.h5")
 
 
-    loss_metrics_eval = model.evaluate(x=test_data, y=test_labels, batch_size=128)
+    loss_metrics_eval = model.evaluate(x=test_data, y=test_labels, batch_size=config["BATCH_SIZE"])
     print("Evaluated metrics = {} \n {}".format(loss_metrics_eval, model.metrics_names))
 
