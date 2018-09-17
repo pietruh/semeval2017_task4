@@ -11,6 +11,20 @@ import keras.backend as K
 import pickle   # for tokenizer dumping
 
 
+
+def gpu_configuration_initialization():
+    """ Set Keras input data format and GPU memory allocation mode. """
+
+    import tensorflow as tf
+    from keras.backend.tensorflow_backend import set_session
+
+    K.set_image_data_format('channels_first')
+    GPU_config = tf.ConfigProto()
+    GPU_config.gpu_options.allow_growth = True
+    # config.gpu_options.per_process_gpu_memory_fraction = 0.4
+    set_session(tf.Session(config=GPU_config))
+
+
 def path_builder(path):
     """ Build path if it does not exist"""
     if not os.path.exists(path):
@@ -90,10 +104,10 @@ def vectorize_text(texts, labels, **kwargs):
 def vectorize_text_test(texts, labels, tokenizer=None, **kwargs):
     """Uses trained tokenizer to transform texts to sequences"""
     MAX_SEQUENCE_LENGTH = kwargs.get("MAX_SEQUENCE_LENGTH", 50)
-
+    TOKENIZER_PATH = kwargs.get("TOKENIZER_PATH", "./tokenizer.pickle")
     if tokenizer==None:
         # loading
-        with open('tokenizer.pickle', 'rb') as handle:
+        with open(TOKENIZER_PATH, 'rb') as handle:
             tokenizer = pickle.load(handle)
 
     sequences = tokenizer.texts_to_sequences(texts)
@@ -165,7 +179,37 @@ def get_data(data_directory, config, tokenizer=None, mode="training"):
     elif mode == "test":
         data, labels, word_index, tokenizer = vectorize_text_test(texts=texts, labels=labels, tokenizer=tokenizer, **config)
 
-    return data, labels, word_index, tokenizer
+    return data, labels, word_index, tokenizer, texts
+
+def save_predictions(prediction_directory, predictions):
+    with open(prediction_directory, "w") as text_file:
+        for i in range(0, len(predictions)):
+            text_file.write(
+                "Negative = {}, Neutral = {}, Positive = {}".format(predictions[i][0], predictions[i][1], predictions[i][2]))
+    return 1
+
+
+def save_text_as_tweet(x, y, filename):
+    id = 0
+    # tk = test_tokenizer
+    # index_word = {v: k for k, v in tk.word_index.items()}  # map back
+    # seqs = tk.texts_to_sequences(one_tweet_seq_tokenized)
+    # words = []
+    # for seq in seqs:
+    #     if len(seq):
+    #         words.append(index_word.get(seq[0]))
+    #     else:
+    #         words.append(' ')
+    # # print(''.join(words)) # output
+
+    with open(filename, 'w') as handle:
+        for line in range(0, len(x)):
+            arg = np.argmax(y[id])
+            label = int(arg == 0) * "negative" + int(arg == 1) * "neutral" + int(arg == 2) * "positive"
+            handle.write("{}\t{}\t{}\n".format(id, label, x[id]))
+            id += 1
+    print("Saved {} lines into file {}".format(id, filename))
+    return
 
 ## ---------------------------------------------------------------------------------------------------------------------
 #region losses
