@@ -26,6 +26,7 @@ class SynonymDataGenerator(keras.utils.Sequence):
         self.train_data_x = train_data_x
         self.train_data_y = train_data_y
         self.embeddings_index = embeddings_index
+        self.word_index = word_index
         self.word_index_keys_as_list = list(word_index.keys())
         self.word_index_keys_as_arr = np.array(list(word_index.keys()))
 
@@ -37,6 +38,7 @@ class SynonymDataGenerator(keras.utils.Sequence):
         self.model_emb = api.load("glove-twitter-25")  # download the model and return as object ready for use
 
         self.on_epoch_end()
+        print("self.__len__() = {}".format(self.__len__()))
         return
 
 
@@ -51,7 +53,7 @@ class SynonymDataGenerator(keras.utils.Sequence):
         indexes = self.indexes[index * self.batch_size:(index + 1) * self.batch_size]
 
         # Find list of IDs
-        list_IDs_temp = [self.list_IDs[k] for k in indexes]
+        #list_IDs_temp = [self.list_IDs[k] for k in indexes]
 
         # Generate data
         X, y = self.__data_generation(indexes)
@@ -67,13 +69,13 @@ class SynonymDataGenerator(keras.utils.Sequence):
         """Generates data containing batch_size samples"""
 
         # Initialization
-        x = np.copy(self.train_data_x)
+        x = np.copy(self.train_data_x[indexes])
         #x = np.empty((self.batch_size, self.config["MAX_SEQUENCE_LENGTH"]))
-        y = np.empty((self.batch_size, self.config["OUTPUT_CLASSES"]))
+        y = np.copy(self.train_data_y[indexes])
 
         # Here, draft some of the x-inputs and modify them
         # Parametrise the augmentation process
-
+        synonimize_data(self.train_data_x, indexes, self.batch_size, self.word_index_keys_as_arr, self.word_index, self.model_emb,**self.config)
         # Determine which of the inputs will be modified by the synonimization process
         num_of_synon_arrays = np.floor(self.batch_size*self.config["SYNONIMIZE_FRACTION"])
         # TODO: finish data generation. Consider having augmentation function as a stand-alone fucntion not, neccesarilly member funciton.
@@ -82,12 +84,13 @@ class SynonymDataGenerator(keras.utils.Sequence):
         # TODO: Set some threshold above which words are similar: experimentally test that
 
         #np.array
-        in_batch_IDs = random.sample(indexes, num_of_synon_arrays)
+        #in_batch_IDs = random.sample(indexes, num_of_synon_arrays)
+        in_batch_IDs = random.sample(list(indexes), int(num_of_synon_arrays))
         # Determine how many words will be synonymized in the sentence
         ## tweets_affected = self.train_data_x[in_batch_IDs]  # this should work
         # draft 2d array of random positions
         # for each tweet generate positions of words that will be impacted and store them in the array
-
+        tweet_cnt = 0
         for one_tweet_id in in_batch_IDs:
             #find #SYNONIMIZE_WORDS non-zeros in the tweets
             one_tweet_seq = self.train_data_x[one_tweet_id]
@@ -98,17 +101,27 @@ class SynonymDataGenerator(keras.utils.Sequence):
             tmp = one_tweet_seq[positions]
             words_to_be_changed = self.word_index_keys_as_arr[tmp - 1]  # words as text
             for word_ind in range(0, len(words_to_be_changed)):
-                synonyms = self.model_emb.most_similar(words_to_be_changed[word_ind])[0]
+                try:
+                    synonyms = self.model_emb.most_similar(words_to_be_changed[word_ind])[0]
 
-                # Check if synonym is acceptable, if yes, then change original word id in the sequence for the synon_id
-                if synonyms[0][1] > self.config["SYNONIM_SIMILARITY_THR"]:
-                    synonym_id = self.word_index[synonyms[0][0]]
-                    one_tweet_seq[positions[word_ind]] = synonym_id
-
+                    # Check if synonym is acceptable, if yes, then change original word id in the sequence for the synon_id
+                    if synonyms[1] > self.config["SYNONIM_SIMILARITY_THR"]:
+                        synonym_id = self.word_index[synonyms[0]]
+                        one_tweet_seq[positions[word_ind]] = synonym_id
+                except:
+                    continue
             # assign modified sequence back to the x training data
-            x[one_tweet_id] = one_tweet_seq
+            # TODO: prevent deepcoppying the whole dataset, restrict it only to the batch   and keep track of the lowest index
+            #x[one_tweet_id] = one_tweet_seq
+            twt_pos_in_batch = one_tweet_id-indexes[0]
+            x[twt_pos_in_batch] = one_tweet_seq
+
             # leave y the same
         return x, y
 
     def get_len_non_zero(self, one_tweet_text):
         return
+
+
+def synonimize_data(train_data_x, indexes, batch_size, word_index_keys_as_arr, word_index, model_emb,**kwargs):
+    SYNONIMIZE_WORDS_FRACTION = kwargs.get("SYNONIMIZE_WORDS_FRACTION", 0.2)
