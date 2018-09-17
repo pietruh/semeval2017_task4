@@ -68,60 +68,105 @@ class SynonymDataGenerator(keras.utils.Sequence):
     def __data_generation(self, indexes):
         """Generates data containing batch_size samples"""
 
-        # Initialization
-        x = np.copy(self.train_data_x[indexes])
-        #x = np.empty((self.batch_size, self.config["MAX_SEQUENCE_LENGTH"]))
-        y = np.copy(self.train_data_y[indexes])
-
         # Here, draft some of the x-inputs and modify them
         # Parametrise the augmentation process
-        synonimize_data(self.train_data_x, indexes, self.batch_size, self.word_index_keys_as_arr, self.word_index, self.model_emb,**self.config)
-        # Determine which of the inputs will be modified by the synonimization process
-        num_of_synon_arrays = np.floor(self.batch_size*self.config["SYNONIMIZE_FRACTION"])
-        # TODO: finish data generation. Consider having augmentation function as a stand-alone fucntion not, neccesarilly member funciton.
-        # TODO: Write "most_similar" for a dictionary of arrays -> this will find synonyms in the dataset. Also consider np/tf/keras built-in algorithm for that, like Nearest-neighbor for example.
-        # TODO: This may be solved by loading pretrained model from keras.api that has it implemented
-        # TODO: Set some threshold above which words are similar: experimentally test that
+        x, y = synonimize_data(self.train_data_x, self.train_data_y, indexes, self.batch_size,
+                               self.word_index_keys_as_arr, self.word_index, self.model_emb, **self.config)
 
-        #np.array
-        #in_batch_IDs = random.sample(indexes, num_of_synon_arrays)
-        in_batch_IDs = random.sample(list(indexes), int(num_of_synon_arrays))
-        # Determine how many words will be synonymized in the sentence
-        ## tweets_affected = self.train_data_x[in_batch_IDs]  # this should work
-        # draft 2d array of random positions
-        # for each tweet generate positions of words that will be impacted and store them in the array
-        tweet_cnt = 0
-        for one_tweet_id in in_batch_IDs:
-            #find #SYNONIMIZE_WORDS non-zeros in the tweets
-            one_tweet_seq = self.train_data_x[one_tweet_id]
-            first_non_zero_pos = (one_tweet_seq == 0).argmin()
-            num_words_to_change = int(self.config["SYNONIMIZE_WORDS_FRACTION"] * (len(one_tweet_seq) - first_non_zero_pos))
-            positions = random.sample(range(first_non_zero_pos, len(one_tweet_seq)), num_words_to_change)
-            #words_to_be_changed = self.word_index_keys_as_list[positions]
-            tmp = one_tweet_seq[positions]
-            words_to_be_changed = self.word_index_keys_as_arr[tmp - 1]  # words as text
-            for word_ind in range(0, len(words_to_be_changed)):
-                try:
-                    synonyms = self.model_emb.most_similar(words_to_be_changed[word_ind])[0]
-
-                    # Check if synonym is acceptable, if yes, then change original word id in the sequence for the synon_id
-                    if synonyms[1] > self.config["SYNONIM_SIMILARITY_THR"]:
-                        synonym_id = self.word_index[synonyms[0]]
-                        one_tweet_seq[positions[word_ind]] = synonym_id
-                except:
-                    continue
-            # assign modified sequence back to the x training data
-            # TODO: prevent deepcoppying the whole dataset, restrict it only to the batch   and keep track of the lowest index
-            #x[one_tweet_id] = one_tweet_seq
-            twt_pos_in_batch = one_tweet_id-indexes[0]
-            x[twt_pos_in_batch] = one_tweet_seq
-
-            # leave y the same
+        # # Determine which of the inputs will be modified by the synonimization process
+        # num_of_synon_arrays = np.floor(self.batch_size*self.config["SYNONIMIZE_FRACTION"])
+        # # TODO: finish data generation. Consider having augmentation function as a stand-alone fucntion not, neccesarilly member funciton.
+        # # TODO: Write "most_similar" for a dictionary of arrays -> this will find synonyms in the dataset. Also consider np/tf/keras built-in algorithm for that, like Nearest-neighbor for example.
+        # # TODO: This may be solved by loading pretrained model from keras.api that has it implemented
+        # # TODO: Set some threshold above which words are similar: experimentally test that
+        #
+        # #np.array
+        # #in_batch_IDs = random.sample(indexes, num_of_synon_arrays)
+        # in_batch_IDs = random.sample(list(indexes), int(num_of_synon_arrays))
+        # # Determine how many words will be synonymized in the sentence
+        # ## tweets_affected = self.train_data_x[in_batch_IDs]  # this should work
+        # # draft 2d array of random positions
+        # # for each tweet generate positions of words that will be impacted and store them in the array
+        # tweet_cnt = 0
+        # for one_tweet_id in in_batch_IDs:
+        #     #find #SYNONIMIZE_WORDS non-zeros in the tweets
+        #     one_tweet_seq = self.train_data_x[one_tweet_id]
+        #     first_non_zero_pos = (one_tweet_seq == 0).argmin()
+        #     num_words_to_change = int(self.config["SYNONIMIZE_WORDS_FRACTION"] * (len(one_tweet_seq) - first_non_zero_pos))
+        #     positions = random.sample(range(first_non_zero_pos, len(one_tweet_seq)), num_words_to_change)
+        #     #words_to_be_changed = self.word_index_keys_as_list[positions]
+        #     tmp = one_tweet_seq[positions]
+        #     words_to_be_changed = self.word_index_keys_as_arr[tmp - 1]  # words as text
+        #     for word_ind in range(0, len(words_to_be_changed)):
+        #         try:
+        #             synonyms = self.model_emb.most_similar(words_to_be_changed[word_ind])[0]
+        #
+        #             # Check if synonym is acceptable, if yes, then change original word id in the sequence for the synon_id
+        #             if synonyms[1] > self.config["SYNONIM_SIMILARITY_THR"]:
+        #                 synonym_id = self.word_index[synonyms[0]]
+        #                 one_tweet_seq[positions[word_ind]] = synonym_id
+        #         except:
+        #             continue
+        #     # assign modified sequence back to the x training data
+        #     # TODO: prevent deepcoppying the whole dataset, restrict it only to the batch   and keep track of the lowest index
+        #     #x[one_tweet_id] = one_tweet_seq
+        #     twt_pos_in_batch = one_tweet_id-indexes[0]
+        #     x[twt_pos_in_batch] = one_tweet_seq
+        #
+        #     # leave y the same
         return x, y
 
     def get_len_non_zero(self, one_tweet_text):
         return
 
 
-def synonimize_data(train_data_x, indexes, batch_size, word_index_keys_as_arr, word_index, model_emb,**kwargs):
+def synonimize_data(train_data_x, train_data_y, indexes, batch_size, word_index_keys_as_arr, word_index, model_emb,
+                    **kwargs):
+    SYNONIMIZE_FRACTION = kwargs.get("SYNONIMIZE_FRACTION", 0.2)
     SYNONIMIZE_WORDS_FRACTION = kwargs.get("SYNONIMIZE_WORDS_FRACTION", 0.2)
+    SYNONIM_SIMILARITY_THR = kwargs.get("SYNONIM_SIMILARITY_THR", 0.9)
+
+    x = np.copy(train_data_x[indexes])
+    y = np.copy(train_data_y[indexes])
+
+    # Determine which of the inputs will be modified by the synonimization process
+    num_of_synon_arrays = np.floor(batch_size*SYNONIMIZE_FRACTION)
+    # TODO: finish data generation. Consider having augmentation function as a stand-alone fucntion not, neccesarilly member funciton.
+    # TODO: Write "most_similar" for a dictionary of arrays -> this will find synonyms in the dataset. Also consider np/tf/keras built-in algorithm for that, like Nearest-neighbor for example.
+    # TODO: This may be solved by loading pretrained model from keras.api that has it implemented
+    # TODO: Set some threshold above which words are similar: experimentally test that
+
+    #np.array
+    #in_batch_IDs = random.sample(indexes, num_of_synon_arrays)
+    in_batch_IDs = random.sample(list(indexes), int(num_of_synon_arrays))
+    # Determine how many words will be synonymized in the sentence
+    # draft 2d array of random positions
+    # for each tweet generate positions of words that will be impacted and store them in the array
+    tweet_cnt = 0
+    for one_tweet_id in in_batch_IDs:
+        #find how many words will be changed in the tweet
+        one_tweet_seq = train_data_x[one_tweet_id]
+        first_non_zero_pos = (one_tweet_seq == 0).argmin()
+        num_words_to_change = int(SYNONIMIZE_WORDS_FRACTION * (len(one_tweet_seq) - first_non_zero_pos))
+        positions = random.sample(range(first_non_zero_pos, len(one_tweet_seq)), num_words_to_change)
+        tmp = one_tweet_seq[positions]
+        words_to_be_changed = word_index_keys_as_arr[tmp - 1]  # words as text
+        for word_ind in range(0, len(words_to_be_changed)):
+            try:
+                synonyms = model_emb.most_similar(words_to_be_changed[word_ind])[0]
+
+                # Check if synonym is acceptable, if yes, then change original word id in the sequence for the synon_id
+                if synonyms[1] > SYNONIM_SIMILARITY_THR:
+                    synonym_id = word_index[synonyms[0]]
+                    one_tweet_seq[positions[word_ind]] = synonym_id
+            except:
+                continue
+        # assign modified sequence back to the x training data
+        # TODO: prevent deepcoppying the whole dataset, restrict it only to the batch   and keep track of the lowest index
+        twt_pos_in_batch = one_tweet_id-indexes[0]
+        x[twt_pos_in_batch] = one_tweet_seq
+
+        # leave y the same
+    return x, y
+
+
