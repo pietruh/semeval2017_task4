@@ -90,12 +90,16 @@ def get_RNN_model_w_layer(embedding_layer, macro_averaging_recall, macro_average
     return_sequences = True
     consume_less = 'cpu'
     dropout_U = 0.3
-    model = Sequential()
     dropout_rnn = 0.3
     dropout_final = 0.5
     loss_l2 = 0.0001
     clipnorm = 5.
     lr = 0.001
+
+
+    model = Sequential()
+
+
     # define embedding input layer
 
     model.add(embedding_layer)
