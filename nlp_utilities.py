@@ -1,5 +1,7 @@
-"""Utilities functions for setting up environment, data processing pipeline, saving results to file and losses
-definition"""
+"""
+Utilities functions for setting up environment, data processing pipeline, saving results to file and losses
+definition
+"""
 
 import os
 import numpy as np
@@ -11,10 +13,11 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
 import keras.backend as K
 
-import pickle   # for tokenizer dumping
+import pickle  # for tokenizer dumping
 from text_processor import text_processor
 
-
+## ---------------------------------------------------------------------------------------------------------------------
+# region utilities
 def gpu_configuration_initialization():
     """
     Set Keras GPU memory allocation mode.
@@ -33,6 +36,7 @@ def path_builder(path):
         os.makedirs(path)
     return
 
+
 def remove_duplicates(texts):
     """
     Remove possible duplicates from list
@@ -40,6 +44,7 @@ def remove_duplicates(texts):
     :type texts: list of str
     """
     return list(set(texts))
+
 
 def list_txt_files_in_dir(directory):
     """
@@ -81,14 +86,12 @@ def read_txt_files(list_files):
     return data, target
 
 
-
-
 def index_word_vectors(filename_to_read, **kwargs):
     """
     Creating dictionary that maps word to ID based on some word2vec pretrained file. It will be used in the embedding layer.
     :param filename_to_read: Name of the file that contains word2vec word embeddings.
-    :param kwargs:
-    :return:
+    :param kwargs: Configuration dictionary. Expected to see MAX_INDEX_CNT
+    :return embeddings_index: dictionary that assigns vector coefficients to the word
     """
     max_cnt = kwargs.get("MAX_INDEX_CNT", 1000010000)
 
@@ -100,7 +103,7 @@ def index_word_vectors(filename_to_read, **kwargs):
             word = values[0]
             coefs = np.asarray(values[1:], dtype='float32')
             embeddings_index[word] = coefs
-            cnt+=1
+            cnt += 1
             if cnt > max_cnt:
                 break
     return embeddings_index
@@ -219,18 +222,19 @@ def split_data(data, labels, **kwargs):
 
 
 def prepare_embedding_matrix(word_index, embeddings_index, **kwargs):
-    """Preparing embedding matrix to be used in keras mdoel
-    :param word_index:
-    :param embeddings_index:
-    :param kwargs:
-    :return:
-
+    """
+    Preparing embedding matrix to be used in keras model
+    :param word_index: dictionary mapping words to index
+    :param embeddings_index: dictionary that assigns vector coefficients to the word
+    :param kwargs: Configuration dictionary, expecting to see values of MAX_NUM_WORDS, EMBEDDING_DIM
+    :return embedding_matrix: Look-up Table that for each entry(word id) gets vector coefficients
+    :return num_words: Number of words that the matrix can keep
     """
     # parameters
     MAX_NUM_WORDS = kwargs.get("MAX_NUM_WORDS", 200000)
     EMBEDDING_DIM = kwargs.get("EMBEDDING_DIM", 100)
 
-    print('Preparing embedding matrix.')
+    print("Preparing embedding matrix.")
 
     num_words = min(MAX_NUM_WORDS, len(word_index) + 1)
     embedding_matrix = np.zeros((num_words, EMBEDDING_DIM))
@@ -244,9 +248,20 @@ def prepare_embedding_matrix(word_index, embeddings_index, **kwargs):
     return embedding_matrix, num_words
 
 
-
 def get_data(data_directory, config, tokenizer=None, mode="training"):
-    # evaluate trained model on a test set
+    """
+    Load the data and return for training. This will search given directory looking for data, read and parse files and
+    vectorize text.
+    :param data_directory: Directory in which there are .txt files with twitter messages
+    :param config: Configuration dictionary
+    :param tokenizer: Tokenizer is mandatory for testing(it can be loaded from default if not given), and will be
+                      returned if training
+    :param mode: Either fitting tokenizer on training data or using it to tokenize test data
+    :return data: Vectorized data,
+    :return labels: one-hot encoded labels,
+    :return word_index:  dictionary mapping words to index
+    :return tokenizer: tokenizer that was used
+    """
     txt_files = list_txt_files_in_dir(data_directory)
     texts, target = read_txt_files(txt_files)
     target = np.asarray(target)
@@ -258,30 +273,35 @@ def get_data(data_directory, config, tokenizer=None, mode="training"):
     if mode == "training":
         data, labels, word_index, tokenizer = vectorize_text(texts, labels, **config)
     elif mode == "test":
-        data, labels, word_index, tokenizer = vectorize_text_test(texts=texts, labels=labels, tokenizer=tokenizer, **config)
+        data, labels, word_index, tokenizer = vectorize_text_test(texts=texts, labels=labels, tokenizer=tokenizer,
+                                                                  **config)
 
     return data, labels, word_index, tokenizer, texts
 
+
 def save_predictions(prediction_directory, predictions):
+    """
+    Saving predictions with their probabilities
+    :param prediction_directory: Directory in which file will be saved
+    :param predictions: Arrays with predictions. For each tweet there is an 3 cells array with Negative, Neutral,
+                        Positive probabilities
+    """
     with open(prediction_directory, "w") as text_file:
         for i in range(0, len(predictions)):
             text_file.write(
-                "Negative = {}, Neutral = {}, Positive = {}\n".format(predictions[i][0], predictions[i][1], predictions[i][2]))
-    return 1
-
-
-def save_class_predictions_w_tweets(prediction_directory, predictions, test_text):
-    class_predictions = tf.argmax(predictions, axis=1)
-    with open(prediction_directory, "w") as text_file:
-
-        for i in range(0, len(predictions)):
-
-            text_file.write(
-                "Negative = {}, Neutral = {}, Positive = {}\n".format(predictions[i][0], predictions[i][1], predictions[i][2]))
-    return 1
+                "Negative = {}, Neutral = {}, Positive = {}\n".format(predictions[i][0], predictions[i][1],
+                                                                      predictions[i][2]))
+    return
 
 
 def save_text_as_tweet(x, y, filename):
+    """
+    Saving predictions in the original format, with ID, class label and twitter message
+    :param x: Texts of the twitter messages
+    :param y: Arrays with predictions. For each tweet there is an 3 cells array with Negative, Neutral,
+              Positive probabilities
+    :param filename: Filename in the directory in which file will be saved
+    """
     id = 0
     with open(filename, 'w') as handle:
         for line in range(0, len(x)):
@@ -291,9 +311,11 @@ def save_text_as_tweet(x, y, filename):
             id += 1
     print("Saved {} lines into file {}".format(id, filename))
     return
+# endregion utilities
+## ---------------------------------------------------------------------------------------------------------------------
 
 ## ---------------------------------------------------------------------------------------------------------------------
-#region losses
+# region losses
 
 
 def recall(y_true, y_pred):
@@ -301,6 +323,9 @@ def recall(y_true, y_pred):
      Only computes a batch-wise average of recall.
      Computes the recall, a metric for multi-label classification of
     how many relevant items are selected.
+    :param y_true:
+    :param y_pred:
+    :return:
     """
 
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
@@ -310,10 +335,14 @@ def recall(y_true, y_pred):
 
 
 def recall_soft(y_true, y_pred):
-    """Recall metric, for one class, without rounding.
-    It can be used as a loss metrics as it's gradient can be calculated
-     Computes the recall, a metric for multi-label classification of
+    """
+    Recall metric, for one class, without rounding.
+    It can be used as a loss metrics as it's gradient can be calculated.
+    Computes the recall, a metric for multi-label classification of
     how many relevant items are selected.
+    :param y_true: Ground-truth values for classification
+    :param y_pred: Predicted values of classifications
+    :return: recall = Correctly predicted with that label/ #All ground-truth values with that label
     """
 
     true_positives = K.sum(y_true * y_pred)
@@ -326,6 +355,9 @@ def macro_averaged_recall_tf_soft(y_true, y_pred):
     """
     Using softmax output to macro averaging - averaging over classes. Calculate per class recall and average.
     This is a differentiable loss function.
+     :param y_true: Ground-truth values for classification
+    :param y_pred: Predicted values of classifications
+    :return: Recall averaged across classes
     """
     r_neg = recall_soft(y_true[:, 0], y_pred[:, 0])
     r_neu = recall_soft(y_true[:, 1], y_pred[:, 1])
@@ -338,6 +370,9 @@ def macro_averaged_recall_tf_onehot(y_true, y_pred):
     """
     Using one hot encoded output to macro averaging - averaging over classes. Calculate per class recall and average.
     Due to rounding and argmax ops it is not differentiable.
+     :param y_true: Ground-truth values for classification
+    :param y_pred: Predicted values of classifications
+    :return: recall = Correctly predicted with that label/ #All ground-truth values with that label
     """
     max_vals = tf.argmax(y_pred, axis=1)
     y_pred_one_hot = tf.one_hot(max_vals, depth=3)
@@ -347,4 +382,4 @@ def macro_averaged_recall_tf_onehot(y_true, y_pred):
     # return as negative so it will be minimized and absolute value of recall with be maximized
     return -(r_neg + r_neu + r_pos) / 3
 
-#endregion losses
+# endregion losses
