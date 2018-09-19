@@ -88,7 +88,8 @@ def read_txt_files(list_files):
 
 def index_word_vectors(filename_to_read, **kwargs):
     """
-    Creating dictionary that maps word to ID based on some word2vec pretrained file. It will be used in the embedding layer.
+    Creating dictionary that maps word to ID based on some word2vec pretrained file. It will be used in the embedding
+    layer.
     :param filename_to_read: Name of the file that contains word2vec word embeddings.
     :param kwargs: Configuration dictionary. Expected to see MAX_INDEX_CNT
     :return embeddings_index: dictionary that assigns vector coefficients to the word
@@ -114,8 +115,7 @@ def vectorize_text(texts, labels, **kwargs):
     Vectorize the text samples into a 2D integer tensor.
     :param texts: Text that will be used by the tokenizer for fitting
     :param labels: Classified labels will be converted to categorical
-    :param MAX_NUM_WORDS:
-    :param MAX_SEQUENCE_LENGTH:
+
     :param kwargs: Expected to see
     :returns data: Padded text converted to IDs
     :returns labels: Labels as categorical, one-hot encoded vector

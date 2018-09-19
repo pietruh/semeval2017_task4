@@ -3,8 +3,9 @@ Script for evaluating trained model on any dataset that has formatting complaint
 """
 
 from keras.models import load_model
-from nlp_utilities import gpu_configuration_initialization, get_data, save_predictions, macro_averaged_recall_tf_onehot, macro_averaged_recall_tf_soft, save_text_as_tweet
-from config import config # no-brainer version of setting up configuration for testing
+from nlp_utilities import gpu_configuration_initialization, get_data, save_predictions, macro_averaged_recall_tf_onehot, \
+    macro_averaged_recall_tf_soft, save_text_as_tweet
+from config import config  # no-brainer version of setting up configuration for testing
 from keras.utils.generic_utils import get_custom_objects
 from logger_to_file import Logger
 import sys
@@ -22,11 +23,10 @@ if __name__ == "__main__":
     PATH_TO_THE_LEARNING_SESSION = "./learning_sessions/" + NAME_OF_THE_TRAIN_SESSION + "/"
 
     PATH_TO_THE_MODEL = PATH_TO_THE_LEARNING_SESSION + config["MODEL_NAME"]  # path to the model
-    TEST_DIRECTORY = r'./data/sentiment_test/'  # directory that contains test set
+    TEST_DIRECTORY = config["TEST_DIRECTORY"]  # directory that contains test set
     config["TOKENIZER_PATH"] = PATH_TO_THE_LEARNING_SESSION + "tokenizer.pickle"
 
     sys.stdout = Logger(PATH_TO_THE_MODEL[:-3] + "_log_testing")
-
 
     # load model
     print("Loading the model")
@@ -34,8 +34,9 @@ if __name__ == "__main__":
 
     # load & preprocess data (tokenizer will be loaded inside this function)
     print("Loading and preprocessing data")
-    test_data, test_labels, test_word_index, test_tokenizer, test_texts = get_data(TEST_DIRECTORY, config, tokenizer=None,
-                                                                       mode="test")
+    test_data, test_labels, test_word_index, test_tokenizer, test_texts = get_data(TEST_DIRECTORY, config,
+                                                                                   tokenizer=None,
+                                                                                   mode="test")
 
     if eval_or_predict in (0, 2):
         # evaluate the model

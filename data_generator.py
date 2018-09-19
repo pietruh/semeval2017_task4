@@ -39,7 +39,7 @@ class SynonymDataGenerator(keras.utils.Sequence):
         self.word_index_keys_as_arr = np.array(list(word_index.keys()))
 
         self.config = config
-        # TODO: shuffle data on_epoch_end()
+        # TODO: Consider shuffling data on_epoch_end()
 
         # Load model straight from gensim to efficiently find most_similar words
         info = api.info()  # show info about available models/datasets

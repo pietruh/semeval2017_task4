@@ -31,11 +31,11 @@ if __name__ == "__main__":
     # Set up environmental variables etc.
     continue_training = 0
     # Name of the training session to which all objects will be saved
-    NAME_OF_THE_TRAIN_SESSION = "9_testing_no_augmented_data_full_model+gaussian+maxout+macro_loss_+full_data_batch_norm"
+    NAME_OF_THE_TRAIN_SESSION = config["NAME_OF_THE_TRAIN_SESSION"]
     PATH_TO_THE_LEARNING_SESSION = "./learning_sessions/" + NAME_OF_THE_TRAIN_SESSION + "/"
 
     # Name of the pretrained model, if continue_training=1
-    pretrained_filepath = PATH_TO_THE_LEARNING_SESSION + "rnn_model_3.h5"
+    pretrained_filepath = PATH_TO_THE_LEARNING_SESSION + config["MODEL_NAME"]
 
     print("DEBUG = {} \nconfig = {}\nmodel_config = {}".format(DEBUG, config, model_config))
 
@@ -58,15 +58,15 @@ if __name__ == "__main__":
     print("Indexing word vectors.")
 
     # Using twitter specific dataset. Pretrained by glove.
-    filename_to_read = os.path.join("./data/glove.twitter.27B/", "glove.twitter.27B.200d.txt")
+    filename_to_read = config["TWITTER_GLOVE"]
     embeddings_index = index_word_vectors(filename_to_read, **config)
     print("Found {} word vectors.".format(len(embeddings_index)))
 
     # Second, prepare text samples and their labels
     print("Processing text dataset")
 
-    train_directory = r'./data/sentiment_train/'  # r'./data/senti_short/sentiment_train/'
-    test_directory = r'./data/sentiment_test/'  # r'./data/senti_short/sentiment_test/'
+    train_directory = config["TRAIN_DIRECTORY"]
+    test_directory = config["TEST_DIRECTORY"]
 
     # Third, vectorize the training text samples into a 2D integer tensor
     data, labels, word_index, tokenizer, texts = get_data(train_directory, config, tokenizer=None, mode="training")
@@ -140,12 +140,12 @@ if __name__ == "__main__":
         print("Fitting normal way ...")
         history = model.fit(data, labels,
                             batch_size=config["BATCH_SIZE"],
-                            epochs=5,
+                            epochs=config["EPOCHS"],
                             validation_data=(test_data, test_labels),
                             callbacks=callbacks)
 
         print("Fitting normal way Finished...!")
-        model.save(PATH_TO_THE_LEARNING_SESSION + "rnn_model_1_cont.h5")
+        model.save(PATH_TO_THE_LEARNING_SESSION + config["MODEL_NAME"])
 
         loss_metrics_eval = model.evaluate(x=test_data, y=test_labels, batch_size=config["BATCH_SIZE"])
         print("Evaluated metrics = {} \n {}".format(loss_metrics_eval, model.metrics_names))
