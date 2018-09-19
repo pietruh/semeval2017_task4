@@ -26,6 +26,6 @@ config = {"GLOVE_DIR": 'glove.6B',
           "SYNONIM_SIMILARITY_THR": 0.9,
           "model_config": model_config,
           "BATCH_SIZE": 128,
-          "EPOCHS": 20,
+          "EPOCHS": 15,
           "TEXT_PREPROCESSING": 1
           }
