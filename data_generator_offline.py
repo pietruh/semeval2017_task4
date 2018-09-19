@@ -1,4 +1,6 @@
-"""This script generates new data using techniques of data augmentation 'before' fitting the model."""
+"""
+This script generates new data using techniques of data augmentation 'before' fitting the model.
+"""
 
 from config import config
 import numpy as np
@@ -16,7 +18,18 @@ from nlp_utilities import get_data, save_text_as_tweet
 # region augmentation_utilities
 # ----------------------------------------------------------------------------------------------------------------------
 
-def augment_data_offline(text_data_x, text_data_y, indexes, batch_size, type="synon", **kwargs):
+def augment_data_offline(text_data_x, text_data_y, indexes, batch_size, type="syno", **kwargs):
+    """
+    Augmenting data in the offline mode. This will create additional data for training using word synonimization or
+    hypernimization, more generally - knowledge from human made source. It will return batch of the training data
+    :param text_data_x: Texts of the tweets
+    :param text_data_y: Classification data (it won't be modified, just sliced based on indexes)
+    :param indexes: Indexes of the interest. By default that will be the whole inpu array
+    :param batch_size: Size of the batch that will be modified
+    :param type: Type of augmentation, it is either synonymization or hypernymization
+    :param kwargs: Configuration dictionary
+    :return: Batch of the training data. x - training input, y - training target
+    """
     if type == "syno":
         FRACTION = kwargs.get("SYNONIMIZE_FRACTION", 0.2)
         WORDS_FRACTION = kwargs.get("SYNONIMIZE_WORDS_FRACTION", 0.2)
@@ -28,6 +41,9 @@ def augment_data_offline(text_data_x, text_data_y, indexes, batch_size, type="sy
     elif type == "hyper":
         FRACTION = kwargs.get("HYPERNIMIZE_FRACTION", 0.2)
         WORDS_FRACTION = kwargs.get("HYPERNIMIZE_WORDS_FRACTION", 0.2)
+
+    if indexes == None:
+        indexes = np.arange(len(text_data_x))
 
     # Determine which of the inputs will be modified by the synonimization process
     num_of_synon_arrays = np.floor(batch_size * FRACTION)
@@ -49,7 +65,7 @@ def augment_data_offline(text_data_x, text_data_y, indexes, batch_size, type="sy
 
         for word_ind in range(0, len(words_to_be_changed)):
             # Iterate over the wordsto be changed to modify them in a single twitter message
-            #if words_to_be_changed[word_ind] not in("<hashtag>")
+            # if words_to_be_changed[word_ind] not in("<hashtag>")
             if type == "syno":
                 # Find synonym of the word using provided model
                 try:
@@ -83,20 +99,31 @@ def augment_data_offline(text_data_x, text_data_y, indexes, batch_size, type="sy
 
 
 def get_wn_tag(tag):
+    """
+    Map nltk tags into wordnet tags, based on manually prepared dictionary
+    :param tag: nltk tag
+    :return: wordnet tag of an input tag
+    """
     tag_dict = {'NN': 'n', 'JJ': 'a',
                 'VB': 'v', 'RB': 'r'}
     try:
         return tag_dict[tag[0][1]]
     except:
-        return None  #
+        return None
 
 
 def get_hypernym(word):
-    text = word_tokenize(word)
-    pos_tag = nltk.pos_tag(text)
-    pos_tag_wn = get_wn_tag(pos_tag)
+    """
+    Given a word return its hypernym - word that describes more general concept. Wordnet based.
+    :param word: String that will hopefully has some meaning
+    :return: Hypernym of a given word or None if the word's category wasn't find
+    """
+    text = word_tokenize(word)  # get word
+    pos_tag = nltk.pos_tag(text)  # get part of speech tag
+    pos_tag_wn = get_wn_tag(pos_tag)  # convert nltk tag into wordnet
 
     try:
+        # Try to get the first possible hypernym that is of the same part of speech as a given word
         hypernym = [lemma.name() for synset in wn.synset(word + '.' + pos_tag_wn + '.01').hypernyms() for lemma in
                     synset.lemmas()][0]
     except:
