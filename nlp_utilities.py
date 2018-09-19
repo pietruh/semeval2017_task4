@@ -1,39 +1,54 @@
+"""Utilities functions for setting up environment, data processing pipeline, saving results to file and losses
+definition"""
+
 import os
 import numpy as np
 import tensorflow as tf
 
-
+from keras.backend.tensorflow_backend import set_session
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
 import keras.backend as K
 
 import pickle   # for tokenizer dumping
-
+from text_processor import text_processor
 
 
 def gpu_configuration_initialization():
-    """ Set Keras input data format and GPU memory allocation mode. """
+    """
+    Set Keras GPU memory allocation mode.
+    """
 
-    import tensorflow as tf
-    from keras.backend.tensorflow_backend import set_session
-
-    K.set_image_data_format('channels_first')
     GPU_config = tf.ConfigProto()
     GPU_config.gpu_options.allow_growth = True
-    # config.gpu_options.per_process_gpu_memory_fraction = 0.4
     set_session(tf.Session(config=GPU_config))
+    return
 
 
 def path_builder(path):
-    """ Build path if it does not exist"""
+    """Build path if it does not exist
+    :param path: Path to the directory (if it doesn't exist it will be created)"""
     if not os.path.exists(path):
         os.makedirs(path)
     return
 
+def remove_duplicates(texts):
+    """
+    Remove possible duplicates from list
+    :param texts: list with training tweets
+    :type texts: list of str
+    """
+    return list(set(texts))
 
 def list_txt_files_in_dir(directory):
-    """List .txt files in the given directory"""
+    """
+    List .txt files in the given directory
+    :param directory: Path to the directory to be checked
+    :type directory: str
+    :returns: List of .txt files in the directory
+    :rtype: list of str
+    """
     import os
     list_files = []
     for file in os.listdir(directory):
@@ -43,7 +58,15 @@ def list_txt_files_in_dir(directory):
 
 
 def read_txt_files(list_files):
-    """Given list of files with tweets, parse and tokenize it. Returning x, y."""
+    """
+    Given list of files with tweets, parse and tokenize it. Returning text data and target as text
+    :param list_files: List of the filenames that contains tweeter data that is complaint with Semeval2017-Task 4 A
+    :type list_files: list of str
+    :returns: data - texts of tweets, target - it's classification
+    :rtype data: list of str
+    :rtype target: list of str
+    """
+
     # load data
     data = []
     target = []
@@ -58,7 +81,15 @@ def read_txt_files(list_files):
     return data, target
 
 
-def index_word_vectors(filename_to_read, **kwargs): #max_cnt = 100000000):
+
+
+def index_word_vectors(filename_to_read, **kwargs):
+    """
+    Creating dictionary that maps word to ID based on some word2vec pretrained file. It will be used in the embedding layer.
+    :param filename_to_read: Name of the file that contains word2vec word embeddings.
+    :param kwargs:
+    :return:
+    """
     max_cnt = kwargs.get("MAX_INDEX_CNT", 1000010000)
 
     embeddings_index = {}
@@ -76,15 +107,33 @@ def index_word_vectors(filename_to_read, **kwargs): #max_cnt = 100000000):
 
 
 def vectorize_text(texts, labels, **kwargs):
-    """vectorize the text samples into a 2D integer tensor"""
+    """
+    Vectorize the text samples into a 2D integer tensor.
+    :param texts: Text that will be used by the tokenizer for fitting
+    :param labels: Classified labels will be converted to categorical
+    :param MAX_NUM_WORDS:
+    :param MAX_SEQUENCE_LENGTH:
+    :param kwargs: Expected to see
+    :returns data: Padded text converted to IDs
+    :returns labels: Labels as categorical, one-hot encoded vector
+    :returns word_index: Look-up table to be used in Embedding layer
+    :returns tokenizer: Tokenizer, it will be used to prepare test dataset
+    """
+
     MAX_NUM_WORDS = kwargs.get("MAX_NUM_WORDS", 200000)
-    MAX_SEQUENCE_LENGTH = kwargs.get("MAX_SEQUENCE_LENGTH", 50)
+    MAX_SEQUENCE_LENGTH = kwargs.get("MAX_SEQUENCE_LENGTH", 100)
+    TEXT_PREPROCESSING = kwargs.get("TEXT_PREPROCESSING", 1)
 
     tokenizer = Tokenizer(num_words=MAX_NUM_WORDS)
-    tokenizer.fit_on_texts(texts)
-    sequences = tokenizer.texts_to_sequences(texts)
+    processed_text = []
+    if TEXT_PREPROCESSING:
+        for text in texts:
+            processed_text.append(text_processor.pre_process_doc(text))
+
+    tokenizer.fit_on_texts(processed_text)
+    sequences = tokenizer.texts_to_sequences(processed_text)
     word_index = tokenizer.word_index
-    print('Found %s unique tokens.' % len(word_index))
+    print("Found {} unique tokens.".format(len(word_index)))
 
     # saving tokenizer
     with open('tokenizer.pickle', 'wb') as handle:
@@ -96,26 +145,45 @@ def vectorize_text(texts, labels, **kwargs):
 
     data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
     labels = to_categorical(labels)
-    print('Shape of data tensor:', data.shape)
-    print('Shape of label tensor:', labels.shape)
+    print("Shape of data tensor: {}".format(data.shape))
+    print("Shape of label tensor: {}".format(labels.shape))
     return data, labels, word_index, tokenizer
 
 
 def vectorize_text_test(texts, labels, tokenizer=None, **kwargs):
-    """Uses trained tokenizer to transform texts to sequences"""
-    MAX_SEQUENCE_LENGTH = kwargs.get("MAX_SEQUENCE_LENGTH", 50)
+    """
+    Uses trained tokenizer to transform texts to sequences
+    :param texts: List of strings that will be turned into vectors.
+    :param labels: Labels will be turned into one-hot encoded targets.
+    :param tokenizer: Either provide a tokenizer or it will be loaded from default hardcoded name
+    :param kwargs: Aditional arguments that may define MAX_SEQUENCE_LENGTH and TOKENIZER_PATH
+    :returns data: Padded text converted to IDs
+    :returns labels: Labels as categorical, one-hot encoded vector
+    :returns word_index: Look-up table to be used in Embedding layer.
+    :returns tokenizer: Tokenizer, it will be used to prepare test dataset
+    :rtype: object
+    """
+
+    MAX_SEQUENCE_LENGTH = kwargs.get("MAX_SEQUENCE_LENGTH", 100)
     TOKENIZER_PATH = kwargs.get("TOKENIZER_PATH", "./tokenizer.pickle")
-    if tokenizer==None:
+    TEXT_PREPROCESSING = kwargs.get("TEXT_PREPROCESSING", 1)
+
+    if tokenizer == None:
         # loading
         with open(TOKENIZER_PATH, 'rb') as handle:
             tokenizer = pickle.load(handle)
 
-    sequences = tokenizer.texts_to_sequences(texts)
+    processed_text = []
+    if TEXT_PREPROCESSING:
+        for text in texts:
+            processed_text.append(text_processor.pre_process_doc(text))
+
+    sequences = tokenizer.texts_to_sequences(processed_text)
 
     maxlen = 0
     for i in range(0, len(sequences)):
         maxlen = maxlen if len(sequences[i]) < maxlen else len(sequences[i])
-    if(maxlen > MAX_SEQUENCE_LENGTH):
+    if (maxlen > MAX_SEQUENCE_LENGTH):
         print("Found sequence with length {} (words). The maximum allowed length is {}. Script will continue, but your "
               "results may be broken")
 
@@ -127,7 +195,14 @@ def vectorize_text_test(texts, labels, tokenizer=None, **kwargs):
 
 
 def split_data(data, labels, **kwargs):
-    """Split the data into validation test and training"""
+    """
+    Split the data into validation test and training
+    :param data: Network input, called x
+    :param labels: Network target, called y
+    :param kwargs: VALIDATION_SPLIT can be defined as keyword argument
+    :returns x_train, y_train, x_val, y_val: Splitted dataset for the training purposes
+    """
+
     VALIDATION_SPLIT = kwargs.get("VALIDATION_SPLIT", 0.2)
 
     indices = np.arange(data.shape[0])
@@ -144,7 +219,13 @@ def split_data(data, labels, **kwargs):
 
 
 def prepare_embedding_matrix(word_index, embeddings_index, **kwargs):
-    """Preparing embedding matrix to be used in keras mdoel"""
+    """Preparing embedding matrix to be used in keras mdoel
+    :param word_index:
+    :param embeddings_index:
+    :param kwargs:
+    :return:
+
+    """
     # parameters
     MAX_NUM_WORDS = kwargs.get("MAX_NUM_WORDS", 200000)
     EMBEDDING_DIM = kwargs.get("EMBEDDING_DIM", 100)
@@ -185,23 +266,23 @@ def save_predictions(prediction_directory, predictions):
     with open(prediction_directory, "w") as text_file:
         for i in range(0, len(predictions)):
             text_file.write(
-                "Negative = {}, Neutral = {}, Positive = {}".format(predictions[i][0], predictions[i][1], predictions[i][2]))
+                "Negative = {}, Neutral = {}, Positive = {}\n".format(predictions[i][0], predictions[i][1], predictions[i][2]))
+    return 1
+
+
+def save_class_predictions_w_tweets(prediction_directory, predictions, test_text):
+    class_predictions = tf.argmax(predictions, axis=1)
+    with open(prediction_directory, "w") as text_file:
+
+        for i in range(0, len(predictions)):
+
+            text_file.write(
+                "Negative = {}, Neutral = {}, Positive = {}\n".format(predictions[i][0], predictions[i][1], predictions[i][2]))
     return 1
 
 
 def save_text_as_tweet(x, y, filename):
     id = 0
-    # tk = test_tokenizer
-    # index_word = {v: k for k, v in tk.word_index.items()}  # map back
-    # seqs = tk.texts_to_sequences(one_tweet_seq_tokenized)
-    # words = []
-    # for seq in seqs:
-    #     if len(seq):
-    #         words.append(index_word.get(seq[0]))
-    #     else:
-    #         words.append(' ')
-    # # print(''.join(words)) # output
-
     with open(filename, 'w') as handle:
         for line in range(0, len(x)):
             arg = np.argmax(y[id])
@@ -241,21 +322,29 @@ def recall_soft(y_true, y_pred):
     return recall
 
 
-def macro_averaged_recall_tf(y_true, y_pred):
-    """Macro averaging - averaging over classes. Calculate per class recall and average."""
+def macro_averaged_recall_tf_soft(y_true, y_pred):
+    """
+    Using softmax output to macro averaging - averaging over classes. Calculate per class recall and average.
+    This is a differentiable loss function.
+    """
     r_neg = recall_soft(y_true[:, 0], y_pred[:, 0])
     r_neu = recall_soft(y_true[:, 1], y_pred[:, 1])
     r_pos = recall_soft(y_true[:, 2], y_pred[:, 2])
-    return (r_neg + r_neu + r_pos) / 3
+    # return as negative so it will be minimized and absolute value of recall with be maximized
+    return -(r_neg + r_neu + r_pos) / 3
 
 
-def macro_averaged_recall_tf_soft(y_true, y_pred):
-    """Macro averaging - averaging over classes. Calculate per class recall and average."""
+def macro_averaged_recall_tf_onehot(y_true, y_pred):
+    """
+    Using one hot encoded output to macro averaging - averaging over classes. Calculate per class recall and average.
+    Due to rounding and argmax ops it is not differentiable.
+    """
     max_vals = tf.argmax(y_pred, axis=1)
     y_pred_one_hot = tf.one_hot(max_vals, depth=3)
     r_neg = recall(y_true[:, 0], y_pred_one_hot[:, 0])
     r_neu = recall(y_true[:, 1], y_pred_one_hot[:, 1])
     r_pos = recall(y_true[:, 2], y_pred_one_hot[:, 2])
-    return (r_neg + r_neu + r_pos) / 3
+    # return as negative so it will be minimized and absolute value of recall with be maximized
+    return -(r_neg + r_neu + r_pos) / 3
 
 #endregion losses
