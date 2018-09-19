@@ -24,7 +24,6 @@ from logger_to_file import Logger
 from data_generator import SynonymDataGenerator
 from keras.utils.generic_utils import get_custom_objects
 
-
 # ----------------------------------------------------------------------------------------------------------------------
 # region main
 
@@ -66,8 +65,8 @@ if __name__ == "__main__":
     # Second, prepare text samples and their labels
     print("Processing text dataset")
 
-    train_directory = r'./data/sentiment_train/'  #r'./data/senti_short/sentiment_train/'
-    test_directory = r'./data/sentiment_test/'     #r'./data/senti_short/sentiment_test/'
+    train_directory = r'./data/sentiment_train/'  # r'./data/senti_short/sentiment_train/'
+    test_directory = r'./data/sentiment_test/'  # r'./data/senti_short/sentiment_test/'
 
     # Third, vectorize the training text samples into a 2D integer tensor
     data, labels, word_index, tokenizer, texts = get_data(train_directory, config, tokenizer=None, mode="training")
@@ -136,10 +135,9 @@ if __name__ == "__main__":
         loss_metrics_eval = model.evaluate(x=test_data, y=test_labels, batch_size=config["BATCH_SIZE"])
         print("Generator Evaluated !")
 
-
     else:
         # Do not use data augmentation during the training
-        print("Fitting normal way ...1")
+        print("Fitting normal way ...")
         history = model.fit(data, labels,
                             batch_size=config["BATCH_SIZE"],
                             epochs=5,
@@ -152,29 +150,6 @@ if __name__ == "__main__":
         loss_metrics_eval = model.evaluate(x=test_data, y=test_labels, batch_size=config["BATCH_SIZE"])
         print("Evaluated metrics = {} \n {}".format(loss_metrics_eval, model.metrics_names))
 
-        print("Fitting normal way ...2!")
-        history = model.fit(data, labels,
-                            batch_size=config["BATCH_SIZE"],
-                            epochs=5,
-                            validation_data=(test_data, test_labels),
-                            callbacks=callbacks)
-        print("Fitting normal way Finished...!")
-        model.save(PATH_TO_THE_LEARNING_SESSION + "rnn_model_2_cont.h5")
-
-        loss_metrics_eval = model.evaluate(x=test_data, y=test_labels, batch_size=config["BATCH_SIZE"])
-        print("Evaluated metrics = {} \n {}".format(loss_metrics_eval, model.metrics_names))
-
-        print("Fitting normal way ...3!")
-        history = model.fit(data, labels,
-                            batch_size=config["BATCH_SIZE"],
-                            epochs=5,
-                            validation_data=(test_data, test_labels),
-                            callbacks=callbacks)
-        print("Fitting normal way Finished...!")
-        model.save(PATH_TO_THE_LEARNING_SESSION + "rnn_model_3_cont.h5")
-
-        loss_metrics_eval = model.evaluate(x=test_data, y=test_labels, batch_size=config["BATCH_SIZE"])
-        print("Evaluated metrics = {} \n {}".format(loss_metrics_eval, model.metrics_names))
-
     print("Script finished successfully!")
 # endregion main
+# ----------------------------------------------------------------------------------------------------------------------
