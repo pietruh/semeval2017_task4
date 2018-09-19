@@ -1,14 +1,31 @@
-from keras.layers import Embedding, Bidirectional, LSTM, Dropout, MaxoutDense, Dense, Activation, Flatten
-#from keras.layers import Dense, Input, GlobalMaxPooling1D
+"""
+Definition of a models and model utilities are inside this file.
+"""
 
+from keras.layers import Bidirectional, LSTM, Dropout, Dense, Activation, Flatten, GaussianNoise
 from keras.models import Sequential
 from keras.regularizers import l2
 from keras.optimizers import Adam
+from keras.layers import BatchNormalization
 
 
+
+# region models
+# ----------------------------------------------------------------------------------------------------------------------
 def get_RNN(unit=LSTM, cells=64, bi=False, return_sequences=True, dropout_U=0.,
             consume_less='cpu', l2_reg=0):
-    """:param dropout_U: Fraction of the input units to drop for recurrent connections."""
+    """
+    Short function that abstracts recurrent layers generation and returns ready-to-go layer.
+    :param unit: Name of the recurrent neuron unit that will be used in the layer.
+    :param cells: Number of cells (units) for the layer.
+    :param bi: Bidirectional or one directional connections between cells.
+    :param return_sequences: Access the sequence of hidden state outputs.
+    :param dropout_U: Fraction of the input units to drop for recurrent connections.
+    :param consume_less: Optimization setting.
+    :param l2_reg: Weights regularizer.
+    :returns: Recurrent Layer
+    :rtype: keras.layers
+    """
     rnn = unit(cells, return_sequences=return_sequences,
                consume_less=consume_less, dropout_U=dropout_U,
                W_regularizer=l2(l2_reg))
@@ -17,124 +34,71 @@ def get_RNN(unit=LSTM, cells=64, bi=False, return_sequences=True, dropout_U=0.,
     else:
         return rnn
 
-def get_RNN_model(embedding):
-    """First approach to model with Recurrent Units - LSTMs. This may be very dirty and hacky"""
-    classes = 3
-    max_length = 50
-    masking = True
-    return_sequences = True
-    consume_less = 'cpu'
-    dropout_U = 0.3
-    model = Sequential()
-    dropout_rnn = 0.3
-    dropout_final = 0.5
-    loss_l2 = 0.0001
-    clipnorm = 1.
-    lr = 0.001
-    # define embedding input layer
 
-    # TODO: This have to be worked-around as shown in https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
-    embedding = Embedding(
-        input_dim=embeddings.shape[0],
-        output_dim=embeddings.shape[1],
-        input_length=max_length if max_length > 0 else None,
-        trainable=False,
-        mask_zero=masking if max_length > 0 else False,
-        weights=[embeddings]
-    )
-    model.add(embedding)
+def get_RNN_model_w_layer(embedding_layer, macro_averaged_recall_tf_onehot, macro_averaged_recall_tf_soft):
+    """
+    First approach to model with Recurrent Units - LSTMs. This may be very dirty and hacky.
+    This function provides declaration of the model that will be used to fit on data.
+    Compiled, ready-to-go model will be returned.
+    :param embedding_layer: Already pre-trained and pre-loaded Embedding layer that will be used to map the input words
+                            IDs to the vector space.
+    :type embedding_layer: keras.layers.Embedding
+    :returns: Compiled model, ready for fitting to data
+    :rtype: keras.models.Sequential
+    """
+    # TODO: Pass scoring functions in a different way.
+    # TODO: Pass config dict with parsing here. Leaving here just for fast prototyping
+    classes = 3  # Output classes
 
-    rnn_layer_orig = get_RNN()
-    model.add(rnn_layer_orig)
+    dropout_embeddings = 0.3  # Dropout rate after the embedding layer
+    dropout_U = 0.3  # Dropout rate in the recurrent layer
+    dropout_rnn = 0.3  # Dropout rate after the recurrent layer
 
-    # define bidirectional LSTM layer no. 1
+    loss_l2 = 0.0001  # L2 regularization penalty to the loss function to discourage large weights(weight decay)
+    clipnorm = 5.  # Clip the norm of the gradients as an extra safety measure against exploding gradients
+    lr = 0.001  # Starting learning rate for Adam optimizer
+    gaussian_noise = 0.2  # Random data augmentation technique, making this model more robust to overfitting
 
-    # Add dropout for regularization after LSTM layer no. 1
-    model.add(Dropout(dropout_rnn))
-
-    # define bidirectional LSTM layer no. 2
-    rnn_layer_orig_2 = get_RNN()
-
-    # model.add(rnn_layer_orig_2)
-    # # define bidirectional LSTM layer no. 2
-    # rnn_2 = Bidirectional(LSTM(64, return_sequences=return_sequences,
-    #                            consume_less=consume_less, dropout_U=dropout_U,
-    #                            W_regularizer=l2(0.)))
-    # model.add(rnn_2)
-    # Add dropout for regularization after LSTM layer no. 2
-    model.add(Dropout(dropout_rnn))
-
-    # model.add(MaxoutDense(100, input_dim=(None, 50), W_constraint=maxnorm(2)))
-    #
-    # #TODO(MP): Until this it should work
-    # model.add(Dropout(dropout_final))
-
-
-    # define bidirectional LSTM layer no. 1
-
-    model.add(Dense(classes, activity_regularizer=l2(loss_l2)))
-    model.add(Activation('softmax'))
-
-    model.compile(optimizer=Adam(clipnorm=clipnorm, lr=lr),
-                  loss='categorical_crossentropy')
-    return model
-
-
-
-def get_RNN_model_w_layer(embedding_layer, macro_averaging_recall, macro_averaged_recall_tf_soft):
-    """First approach to model with Recurrent Units - LSTMs. This may be very dirty and hacky"""
-    #TODO: Config dict with parsing here
-    classes = 3
-    max_length = 50
-    masking = True
-    return_sequences = True
-    consume_less = 'cpu'
-    dropout_U = 0.3
-    dropout_rnn = 0.3
-    dropout_final = 0.5
-    loss_l2 = 0.0001
-    clipnorm = 5.
-    lr = 0.001
-
-
+    # Create sequential model
     model = Sequential()
 
-
-    # define embedding input layer
-
+    # Perturb inputs with gaussian noise, to make it more robust
+    # Define embedding input layer
     model.add(embedding_layer)
+    model.add(BatchNormalization())
+    model.add(GaussianNoise(gaussian_noise))
+
+    # Add Dropout for regularization after embedding layer
+    model.add(Dropout(dropout_embeddings))
+
+    # Define bidirectional LSTM layer no. 1
+    rnn_layer_orig = get_RNN(cells=150, bi=True, dropout_U=dropout_U)
+    model.add(rnn_layer_orig)
+    # Add dropout for regularization after LSTM layer no. 1
+    model.add(Dropout(dropout_rnn))
+    model.add(BatchNormalization())
+
+    # Define bidirectional LSTM layer no. 2
+
+    rnn_layer_orig_2 = get_RNN(cells=150, bi=True, dropout_U=dropout_U)
+    model.add(rnn_layer_orig_2)
+    # Add dropout for regularization after LSTM layer no. 2
     model.add(Dropout(dropout_rnn))
 
-    rnn_layer_orig = get_RNN(cells=300, bi=True, dropout_U=0.25)
-    model.add(rnn_layer_orig)
-
-    # define bidirectional LSTM layer no. 1
-
-    # Add dropout for regularization after LSTM layer no. 1
-    model.add(Dropout(dropout_final))
-
-    # define bidirectional LSTM layer no. 2
-    rnn_layer_orig_2 = get_RNN(cells=300, bi=True, dropout_U=0.25)
-    model.add(rnn_layer_orig_2)
-    # # define bidirectional LSTM layer no. 2
-    # rnn_2 = Bidirectional(LSTM(64, return_sequences=return_sequences,
-    #                            consume_less=consume_less, dropout_U=dropout_U,
-    #                            W_regularizer=l2(0.)))
-    # model.add(rnn_2)
-    # Add dropout for regularization after LSTM layer no. 2
-    model.add(Dropout(dropout_final))
-
-    # model.add(MaxoutDense(100, input_dim=(None, 50), W_constraint=maxnorm(2)))
-    #
-    # #TODO(MP): Until this it should work
-    # model.add(Dropout(dropout_final))
-
-
-    # define bidirectional LSTM layer no. 1
+    # Add Dense layer, fully connected with softmax activation
     model.add(Flatten())
     model.add(Dense(classes, activity_regularizer=l2(loss_l2)))
     model.add(Activation('softmax'))
 
+    # Compile the model using proided metrics and loss
     model.compile(optimizer=Adam(clipnorm=clipnorm, lr=lr),
-                  loss='categorical_crossentropy', metrics=[macro_averaging_recall, macro_averaged_recall_tf_soft, 'categorical_crossentropy', 'acc'])  # use this:macro_averaging_recall
+                  loss=macro_averaged_recall_tf_soft,
+                  metrics=[macro_averaged_recall_tf_onehot, macro_averaged_recall_tf_soft, 'categorical_crossentropy',
+                           'acc'])
+
+    # Return compiled model
     return model
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# endregion models
