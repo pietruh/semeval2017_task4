@@ -1,33 +1,36 @@
-"""Script for evaluating trained model on any dataset that has formatting complaint with SEMEVAL2017 TASK4-A"""
+"""
+Script for evaluating trained model on any dataset that has formatting complaint with SEMEVAL2017 TASK4-A
+"""
 
 from keras.models import load_model
 from nlp_utilities import gpu_configuration_initialization, get_data, save_predictions, macro_averaged_recall_tf_onehot, macro_averaged_recall_tf_soft, save_text_as_tweet
-from config import config, model_config, DEBUG  # no-brainer version of setting up configuration for testing
+from config import config # no-brainer version of setting up configuration for testing
 from keras.utils.generic_utils import get_custom_objects
+from logger_to_file import Logger
+import sys
 
 if __name__ == "__main__":
-    eval_or_predict = 2  # 0 for evaluation only, 1 for saving predictions ot a file, 2 for both
+    eval_or_predict = 0  # 0 for evaluation only, 1 for saving predictions ot a file, 2 for both
     gpu_configuration_initialization()
     custom_objects = {'macro_averaged_recall_tf_soft': macro_averaged_recall_tf_soft,
                       'macro_averaged_recall_tf_onehot': macro_averaged_recall_tf_onehot
                       }
 
     get_custom_objects().update(custom_objects)
+    NAME_OF_THE_TRAIN_SESSION = config["NAME_OF_THE_TRAIN_SESSION"]
 
-    NAME_OF_THE_TRAIN_SESSION = "7_testing_augmented_data_full_model+gaussian+macro_loss_+full_data"
     PATH_TO_THE_LEARNING_SESSION = "./learning_sessions/" + NAME_OF_THE_TRAIN_SESSION + "/"
 
-    PATH_TO_THE_MODEL = PATH_TO_THE_LEARNING_SESSION + "rnn_model_3.h5"  # path to the model
+    PATH_TO_THE_MODEL = PATH_TO_THE_LEARNING_SESSION + config["MODEL_NAME"]  # path to the model
     TEST_DIRECTORY = r'./data/sentiment_test/'  # directory that contains test set
     config["TOKENIZER_PATH"] = PATH_TO_THE_LEARNING_SESSION + "tokenizer.pickle"
 
-    #path_to_the_best_weights = PATH_TO_THE_LEARNING_SESSION + "weights_ckpt.hdf5"
+    sys.stdout = Logger(PATH_TO_THE_MODEL[:-3] + "_log_testing")
+
 
     # load model
     print("Loading the model")
     model = load_model(PATH_TO_THE_MODEL)
-    #print("Loading the updated weights")
-    #model.load_weights(path_to_the_best_weights)
 
     # load & preprocess data (tokenizer will be loaded inside this function)
     print("Loading and preprocessing data")
